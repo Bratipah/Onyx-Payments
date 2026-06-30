@@ -1,5 +1,5 @@
 {
-  "name": "battleship",
+  "name": "battleshonyxip",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -7,7 +7,7 @@
     "node": ">=22.0.0"
   },
   "scripts": {
-    "compile": "compact compile contract/battleship.compact contract/managed/battleship",
+    "compile": "compact compile contract/onyx.compact contract/managed/onyx",
     "test": "NODE_OPTIONS='--experimental-vm-modules' vitest run",
     "test:local": "MIDNIGHT_NETWORK=local yarn test",
     "env:up": "docker compose up -d --wait",

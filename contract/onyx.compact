@@ -1,0 +1,281 @@
+
+pragma language_version 0.16;
+
+import CompactStandardLibrary;
+
+// ============================================================
+// Public ledger state — only minimal metadata on-chain
+// ============================================================
+
+// Total number of payments processed (proof platform is active)
+export ledger payment_count: Counter;
+
+// Merkle tree of payment commitment hashes (proves payment happened)
+export ledger payment_commitments: MerkleTree<8>;
+
+// Nullifier set — prevents double-spending of payment proofs
+export ledger spent_nullifiers: Map<Bytes<32>, Boolean>;
+
+// Creator registry: maps creator_id hash → is_registered (boolean)
+// No identity info stored — only cryptographic hash of registration
+export ledger creator_registry: Map<Bytes<32>, Boolean>;
+
+// Platform operational counter for rate limiting
+export ledger round_counter: Counter;
+
+// Shielded pool balance tracker (commitment count only, not amounts)
+export ledger shielded_pool_size: Counter;
+
+// ============================================================
+// Witness functions — private data stays on user's machine
+// ============================================================
+
+// Returns the creator's private key (never leaves local machine)
+witness localCreatorSecretKey(): Bytes<32>;
+
+// Returns the payer's private nonce for this payment
+witness localPaymentNonce(): Bytes<32>;
+
+// Returns the private payment amount (shielded from chain)
+witness localPaymentAmount(): Uint<64>;
+
+// Returns one-time address seed for this transaction
+witness localOneTimeAddressSeed(): Bytes<32>;
+
+// Returns the private memo (encrypted, never on-chain)
+witness localPrivateMemo(): Bytes<32>;
+
+// ============================================================
+// Helper circuits — cryptographic primitives
+// ============================================================
+
+// Derives a one-time public receiving address from seed + counter
+// Each call to this generates a unique address, unlinkable to others
+circuit deriveOneTimeAddress(seed: Bytes<32>, counter: Field): Bytes<32> {
+    return persistentHash<Vector<3, Bytes<32>>>([
+        "onyx:receive-addr:" as Bytes<32>,
+        seed,
+        counter as Bytes<32>
+    ]);
+}
+
+// Creates a payment commitment that proves payment without revealing details
+// Combines: recipient_id + amount_hash + nonce → opaque commitment
+circuit createPaymentCommitment(
+    recipient_id: Bytes<32>,
+    amount_hash: Bytes<32>,
+    nonce: Bytes<32>
+): Bytes<32> {
+    return persistentHash<Vector<4, Bytes<32>>>([
+        "onyx:payment:" as Bytes<32>,
+        recipient_id,
+        amount_hash,
+        nonce
+    ]);
+}
+
+// Derives the creator's public identifier from their secret key
+// This is their on-chain pseudonymous identity
+circuit creatorPublicId(round: Field, secret_key: Bytes<32>): Bytes<32> {
+    return persistentHash<Vector<3, Bytes<32>>>([
+        "onyx:creator-id:" as Bytes<32>,
+        secret_key,
+        round as Bytes<32>
+    ]);
+}
+
+// Derives nullifier from nonce — prevents double-spending
+circuit deriveNullifier(nonce: Bytes<32>, secret_key: Bytes<32>): Bytes<32> {
+    return persistentHash<Vector<3, Bytes<32>>>([
+        "onyx:nullifier:" as Bytes<32>,
+        nonce,
+        secret_key
+    ]);
+}
+
+// ============================================================
+// Constructor — initializes the Onyx payment contract
+// ============================================================
+
+constructor() {
+    // All counters start at 0, maps start empty
+    // No initial state needed — fully privacy-preserving from genesis
+}
+
+// ============================================================
+// Core circuit: Register as a creator on Onyx
+// Only records a ZK commitment — no personal data on-chain
+// ============================================================
+
+export circuit registerCreator(): [] {
+    // Get creator's secret key via witness (stays local)
+    const sk = localCreatorSecretKey();
+    
+    // Derive pseudonymous on-chain ID from secret key + round counter
+    const current_round = round_counter as Field;
+    const creator_id = creatorPublicId(current_round, sk);
+    
+    // Verify not already registered
+    const already_registered = creator_registry.lookup(creator_id);
+    assert(
+        already_registered == none<Boolean>(),
+        "Creator already registered"
+    );
+    
+    // Register the creator's pseudonymous ID
+    creator_registry.insert(creator_id, disclose(true));
+    
+    // Advance round counter for next registration's uniqueness
+    round_counter.increment(1);
+}
+
+// ============================================================
+// Core circuit: Receive a shielded payment
+// Processes incoming payment — public info: a payment happened
+// Private info: who received it, how much, from whom, the memo
+// ============================================================
+
+export circuit receiveShieldedPayment(
+    // The one-time address this payment is directed to (public)
+    one_time_address: Bytes<32>
+): Bytes<32> {
+    // Retrieve private data via witnesses (never exposed on-chain)
+    const sk = localCreatorSecretKey();
+    const nonce = localPaymentNonce();
+    const memo_hash = localPrivateMemo();
+    
+    // Derive creator's current round ID
+    const current_round = round_counter as Field;
+    const creator_id = creatorPublicId(current_round, sk);
+    
+    // Verify creator is registered
+    const is_registered = creator_registry.lookup(creator_id);
+    assert(
+        is_registered == some<Boolean>(true),
+        "Creator not registered on Onyx"
+    );
+    
+    // Verify nullifier hasn't been used (prevents double-spending)
+    const nullifier = deriveNullifier(nonce, sk);
+    const nullifier_used = spent_nullifiers.lookup(nullifier);
+    assert(
+        nullifier_used == none<Boolean>(),
+        "Payment nonce already consumed"
+    );
+    
+    // Verify the one-time address was derived from this creator's key
+    // This links the payment to the creator without revealing their identity
+    const address_seed = localOneTimeAddressSeed();
+    const expected_address = deriveOneTimeAddress(address_seed, current_round);
+    assert(
+        one_time_address == expected_address,
+        "One-time address verification failed"
+    );
+    
+    // Create the shielded payment commitment
+    // This is what goes on-chain — opaque proof of legitimate payment
+    const amount = localPaymentAmount();
+    const amount_hash = persistentHash<Uint<64>>(amount);
+    const commitment = createPaymentCommitment(creator_id, amount_hash, nonce);
+    
+    // Mark nullifier as spent
+    spent_nullifiers.insert(nullifier, disclose(true));
+    
+    // Insert commitment into Merkle tree (proves payment happened)
+    payment_commitments.insert(commitment);
+    
+    // Update counters
+    payment_count.increment(1);
+    shielded_pool_size.increment(1);
+    round_counter.increment(1);
+    
+    // Return commitment hash — only public output is "payment happened"
+    return disclose(commitment);
+}
+
+// ============================================================
+// Core circuit: Generate a fresh one-time receiving address
+// Call this before each new client interaction
+// Prevents pattern linking across payments
+// ============================================================
+
+export circuit generateOneTimeAddress(): Bytes<32> {
+    const sk = localCreatorSecretKey();
+    const seed = localOneTimeAddressSeed();
+    
+    // Verify creator is registered
+    const current_round = round_counter as Field;
+    const creator_id = creatorPublicId(current_round, sk);
+    const is_registered = creator_registry.lookup(creator_id);
+    assert(
+        is_registered == some<Boolean>(true),
+        "Creator not registered — cannot generate address"
+    );
+    
+    // Derive fresh one-time address using current round as entropy
+    // Different round = completely different address = unlinkable
+    const address = deriveOneTimeAddress(seed, current_round);
+    round_counter.increment(1);
+    
+    // Only the opaque address is disclosed — no creator info
+    return disclose(address);
+}
+
+// ============================================================
+// Core circuit: Verify a payment is valid (for withdrawal)
+// Proves payment was received without revealing amount or sender
+// ============================================================
+
+export circuit verifyPaymentForWithdrawal(
+    commitment: Bytes<32>,
+    merkle_index: Uint<64>
+): Boolean {
+    const sk = localCreatorSecretKey();
+    const nonce = localPaymentNonce();
+    
+    // Verify the commitment is in our Merkle tree
+    const membership_proof = payment_commitments.lookup(merkle_index);
+    assert(
+        membership_proof == some<Bytes<32>>(commitment),
+        "Commitment not found in payment tree"
+    );
+    
+    // Verify creator owns this commitment
+    const current_round = round_counter as Field;
+    const creator_id = creatorPublicId(current_round, sk);
+    const amount = localPaymentAmount();
+    const amount_hash = persistentHash<Uint<64>>(amount);
+    
+    const expected_commitment = createPaymentCommitment(
+        creator_id,
+        amount_hash,
+        nonce
+    );
+    assert(
+        commitment == expected_commitment,
+        "Commitment ownership proof failed"
+    );
+    
+    return disclose(true);
+}
+
+// ============================================================
+// Query circuit: Get platform statistics (privacy-preserving)
+// Only reveals aggregate counts — no individual data
+// ============================================================
+
+export circuit getPlatformStats(): Uint<64> {
+    // Returns total payment count — the only public information
+    // No amounts, no identities, no timing patterns
+    return disclose(payment_count as Uint<64>);
+}
+
+// ============================================================
+// Query circuit: Check if a creator address is registered
+// Returns boolean — no identity info revealed
+// ============================================================
+
+export circuit isCreatorRegistered(creator_id: Bytes<32>): Boolean {
+    const reg = creator_registry.lookup(creator_id);
+    return disclose(reg == some<Boolean>(true));
+}

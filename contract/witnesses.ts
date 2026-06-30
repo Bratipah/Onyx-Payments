@@ -16,7 +16,7 @@
 // The main purpose of this file is to hold all of the code relevant to private state.
 // It is good practice to isolate this data so that you can start to think of private state
 // in a different context for your DApp
-import { type Ledger, BoardState, ShotState } from './managed/battleship/contract/index.js';
+import { type Ledger, BoardState, ShotState } from './managed/onyx/contract/index.js';
 import { type WitnessContext } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
 
 export type BattlePrivateState = {

@@ -25,15 +25,16 @@ export {
     type Ledger,
     type ImpureCircuits,
     type PureCircuits
-} from './managed/battleship/contract/index.js';
-import { Contract } from './managed/battleship/contract/index.js';
+} from './managed/onyx/contract/index.js';
+import { Contract } from './managed/onyx/contract/index.js';
 import { witnesses } from './witnesses.js';
 
 const currentDir = path.resolve(new URL(import.meta.url).pathname, '..');
 export const zkConfigPath = path.resolve(currentDir, 'managed', 'battleship');
 
-export const CompiledBattleshipContract = CompiledContract.make(
+export const CompiledOnyxContract = CompiledContract.make(
     'BattleshipContract',
+    'OnyxContract'
     Contract,
 ).pipe(
     CompiledContract.withWitnesses(witnesses),
