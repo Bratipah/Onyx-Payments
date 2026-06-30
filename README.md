@@ -2,15 +2,15 @@
 
 > *The first truly private financial stack for content creators, built on Midnight Network.*
 
-> Our core innovation is a private payment shielding system. It processes transactions in a way where the only public information is that a payment happened. All sensitive details;- the exact amount, who the receiver is, the timing, and any attached memo—are kept completely private and encrypted. The system generates a cryptographic proof that validates the transaction is legitimate, without exposing any of that private data.
+ Our core innovation is a private payment shielding system. It processes transactions in a way where the only public information is that a payment happened. All sensitive details;- the exact amount, who the receiver is, the timing, and any attached memo—are kept completely private and encrypted. The system generates a cryptographic proof that validates the transaction is legitimate, without exposing any of that private data.
 
-> This is powered by several key mechanisms:
+This is powered by several key mechanisms:
 
-> - Auto-Shielding: Payments received from external, transparent systems are automatically and instantly converted into our private, shielded pool of funds.
+ - Auto-Shielding: Payments received from external, transparent systems are automatically and instantly converted into our private, shielded pool of funds.
 
-> - Address Rotation: For every new transaction or client interaction, the system generates a unique, one-time receiving address. This prevents anyone from linking multiple transactions together to build a pattern or profile of a user's activity.
+ - Address Rotation: For every new transaction or client interaction, the system generates a unique, one-time receiving address. This prevents anyone from linking multiple transactions together to build a pattern or profile of a user's activity.
 
-> - Fiat Bridges: Users can seamlessly convert their private, shielded funds back into traditional currency (like dollars or euros) and withdraw to a standard bank account through our partner network, all while maintaining the privacy of the transaction's origin and details.
+ - Fiat Bridges: Users can seamlessly convert their private, shielded funds back into traditional currency (like dollars or euros) and withdraw to a standard bank account through our partner network, all while maintaining the privacy of the transaction's origin and details.
 
 ---
 
