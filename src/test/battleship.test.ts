@@ -41,7 +41,7 @@ import {
     TurnState,
     Contract
 } from '../../contract/managed/battleship/contract/index.js';
-import { createBattlePrivateState } from '../../contract/witnesses.js';
+import { createBattlePrivateState } from '../../contract/src/witnesses.js';
 import type { FinalizedCallTxData } from '@midnight-ntwrk/midnight-js-contracts';
 
 process.on('unhandledRejection', (reason, promise) => {
