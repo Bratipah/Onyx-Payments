@@ -6,14 +6,14 @@
 
 > This is powered by several key mechanisms:
 
-- Auto-Shielding: Payments received from external, transparent systems are automatically and instantly converted into our private, shielded pool of funds.
+> - Auto-Shielding: Payments received from external, transparent systems are automatically and instantly converted into our private, shielded pool of funds.
 
-- Address Rotation: For every new transaction or client interaction, the system generates a unique, one-time receiving address. This prevents anyone from linking multiple transactions together to build a pattern or profile of a user's activity.
+> - Address Rotation: For every new transaction or client interaction, the system generates a unique, one-time receiving address. This prevents anyone from linking multiple transactions together to build a pattern or profile of a user's activity.
 
-- Fiat Bridges: Users can seamlessly convert their private, shielded funds back into traditional currency (like dollars or euros) and withdraw to a standard bank account through our partner network, all while maintaining the privacy of the transaction's origin and details.
+> - Fiat Bridges: Users can seamlessly convert their private, shielded funds back into traditional currency (like dollars or euros) and withdraw to a standard bank account through our partner network, all while maintaining the privacy of the transaction's origin and details.
 
 ---
-s
+
 ## 🛡️ What Onyx Solves
 
 | Problem | Traditional Crypto | Onyx |
